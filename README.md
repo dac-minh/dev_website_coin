@@ -33,10 +33,10 @@ cp .env.example .env
 
 # Chỉnh sửa file .env với thông tin PostgreSQL của bạn
 # Ví dụ:
-# DATABASE_URL=postgresql://user:password@localhost/big_data
+# DATABASE_URL=postgresql://user:password@localhost/data
 
 # (Tùy chọn) Seed dữ liệu portfolio
-psql -h localhost -U your_user -d big_data -f seed_portfolio.sql
+psql -h localhost -U your_user -d data -f seed_portfolio.sql
 
 # Chạy backend server
 uvicorn main:app --reload --port 8888
@@ -130,7 +130,7 @@ python -m pytest                         # Chạy tests
 ### Backend (.env)
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost/big_data
+DATABASE_URL=postgresql://user:password@localhost/data
 DEBUG=True
 PORT=8888
 ```
@@ -143,14 +143,14 @@ VITE_API_BASE_URL=http://localhost:8888
 
 ## 📁 Cơ sở dữ liệu
 
-Chắc chắn PostgreSQL đã chạy và có database `big_data`:
+Chắc chắn PostgreSQL đã chạy và có database `data`:
 
 ```bash
 # Tạo database (nếu chưa có)
-createdb -U your_user big_data
+createdb -U your_user data
 
 # Chạy schema (nếu cần)
-psql -U your_user -d big_data < warehouse.sql
+psql -U your_user -d data < warehouse.sql
 ```
 
 ## 🌐 Truy cập ứng dụng
@@ -175,19 +175,5 @@ Sau khi cả frontend và backend đang chạy:
 - Kiểm tra PostgreSQL có đang chạy
 - Kiểm tra credentials trong `.env`
 
-## 📝 Ghi chú
-
-- Frontend hot reload được bật - chỉnh sửa file sẽ reload tự động
-- Backend reload được bật - chỉnh sửa Python code sẽ reload tự động
-- Dữ liệu được lấy từ PostgreSQL warehouse, không phải hardcode
-
-## 📚 Tài liệu thêm
-
-- [React Router Docs](https://reactrouter.com/)
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [TailwindCSS Docs](https://tailwindcss.com/)
-- [Vite Docs](https://vitejs.dev/)
-
----
 
 **Happy coding! 🚀**
