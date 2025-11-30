@@ -46,6 +46,8 @@ class MarketCapGrowthCalculatedItem(BaseModel):
 
 # --- COIN DETAIL MODELS ---
 class CoinDetailMetrics(BaseModel):
+    name: Optional[str]
+    symbol: Optional[str]
     market_cap_usd: Optional[float]
     market_cap_change_pct_24h: Optional[float]
     volume24: Optional[float]
@@ -55,7 +57,7 @@ class CoinDetailMetrics(BaseModel):
     total_supply: Optional[float]
     max_supply: Optional[float]
     circulating_supply: Optional[float]
-    price_usd: Optional[float] # <- Thêm giá
+    price_usd: Optional[float]
 
 class PriceCandle(BaseModel):
     date: datetime 

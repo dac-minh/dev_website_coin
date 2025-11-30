@@ -1,11 +1,9 @@
-// Dashboard.tsx
 import { useEffect, useState, useMemo, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { MoreHorizontal, ArrowUpRight, ArrowDownRight, ChevronDown, Search, CandlestickChart as CandlestickIcon, AreaChart as AreaIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { MoreHorizontal, ArrowUpRight, ArrowDownRight, ChevronDown, Search, CandlestickChart as CandlestickIcon, AreaChart as AreaIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
-// *** IMPORT lightweight-charts (Đã thêm Time, UTCTimestamp) ***
 import { 
     createChart, 
     ColorType, 
@@ -13,9 +11,8 @@ import {
     AreaSeriesPartialOptions, 
     LineStyle, 
     IChartApi, 
-    ISeriesApi,
-    Time,           // <-- MỚI
-    UTCTimestamp    // <-- MỚI: Dùng để định nghĩa kiểu thời gian
+    ISeriesApi, 
+    UTCTimestamp 
 } from 'lightweight-charts';
 
 // --- CẤU HÌNH ---
@@ -33,8 +30,15 @@ type Asset = {
     logo_url: string; 
 };
 
+type PortfolioItem = {
+    n: string; // name
+    c: string; // symbol
+    id: string; // coin_id
+    cl: string; // color
+};
+
 type ChartDataPoint = {
-    date: string; // ISO string date
+    date: string;
     open: number;
     high: number;
     low: number;
@@ -50,6 +54,28 @@ const STATIC_UP_CHART_DATA = [30, 50, 40, 60, 70];
 const STATIC_DOWN_CHART_DATA = [70, 50, 60, 40, 30];
 
 // --- HELPERS ---
+const getCoinLogo = (id: string) => {
+    const mapping: { [key: string]: string } = {
+        "bitcoin": "1", "ethereum": "1027", "tether": "825", "bnb": "1839", "solana": "5426", "usdc": "3408",
+        "wrapped-usdc": "3408", "ripple": "52", "dogecoin": "74", "tron": "1958", "cardano": "2010", "avalanche": "5805",
+        "shiba-inu": "5994", "bitcoin-cash": "1831", "chainlink": "1975", "polkadot": "6636", "near-protocol": "6535",
+        "matic-network": "3890", "litecoin": "2", "pepe": "24478", "dai": "4943", "uniswap": "7083", "kaspa": "20396",
+        "internet-computer": "8916", "aptos": "21794", "monero": "328", "ethereum-classic": "1321", "stacks": "4847",
+        "filecoin": "2280", "render": "5690", "render-token": "5690", "immutable-x": "10603", "hedera-hashgraph": "4642",
+        "arbitrum": "11841", "stellar": "512", "okb": "3897", "cosmos": "3794", "mantle": "27075", "injective-protocol": "5600",
+        "optimism": "11840", "sui": "20947", "first-digital-usd": "26081", "arweave": "5632", "fetch": "3773", "fantom": "3513",
+        "sonic-prev-ftm": "3513", "floki-inu": "10804", "celestia": "22861", "pyth-network": "28177", "algorand": "4030",
+        "gala": "7080", "sei": "23149", "aave": "7278", "quant": "3155", "the-graph": "6719", "lidodao": "8000",
+        "lido-dao": "8000", "jasmycoin": "11208", "ondo-finance": "21159", "flare": "5876", "staked-ether": "8085",
+        "singularitynet": "2424", "eos": "1765", "flow": "4558", "multiversx": "6892", "axie-infinity": "6783",
+        "kucoin-shares": "2087", "bitcoin-sv": "3602", "neo": "1376", "pancakeswap": "7186", "nexo": "2694", "iota": "1720",
+        "pax-gold": "4705", "paypal-usd": "27772", "zcash": "1437", "dash": "131", "maker": "1518", "curve-dao-token": "6538",
+        "spx6900": "28538", "starknet-token": "22691", "wrapped-bitcoin": "3717", "wrapped-sol": "5426",
+        "wrapped-beacon-eth": "24023", "maple-finance": "9366"
+    };
+    return `https://s2.coinmarketcap.com/static/img/coins/64x64/${mapping[id] || "1"}.png`;
+};
+
 const formatPrice = (v: number) => { if (v == null || isNaN(v)) return "---"; if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`; if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`; if (v >= 1e3) return `$${(v / 1e3).toFixed(2)}K`; return v < 10 ? `$${v.toFixed(4)}` : `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; };
 const formatDateAPI = (date: Date) => { const d = new Date(date.getTime() - (date.getTimezoneOffset() * 60000)); return d.toISOString().split('T')[0]; };
 
@@ -70,31 +96,42 @@ const getStartDate = (range: TimeRange): string => {
 
 // --- COMPONENTS ---
 
-// SparklineChart
 const SparklineChart = ({ data, color }: { data: number[], color: string }) => {
-    const chartData = useMemo(() => data.map(price => ({ v: price })), [data]);
+    const chartData = useMemo(() => data.map((price, index) => ({ i: index, v: price })), [data]);
+
+    if (!data || data.length === 0) return <div className="mt-6 h-12 w-full bg-white/5 rounded" />;
+
     return (
         <div className="mt-6 h-12 w-full opacity-80 group-hover:opacity-100 transition-opacity">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                     <defs>
                         <linearGradient id={`spark-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={color} stopOpacity={0.6} />
-                            <stop offset="100%" stopColor={color} stopOpacity={0.1} />
+                            <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+                            <stop offset="100%" stopColor={color} stopOpacity={0.0} />
                         </linearGradient>
                     </defs>
-                    <Area type="linear" dataKey="v" stroke={color} strokeWidth={3} fill={`url(#spark-${color.replace("#", "")})`} isAnimationActive={false} dot={false} activeDot={false} />
+                    <Area 
+                        type="monotone" 
+                        dataKey="v" 
+                        stroke={color} 
+                        strokeWidth={2} 
+                        fill={`url(#spark-${color.replace("#", "")})`} 
+                        isAnimationActive={false} 
+                        dot={false} 
+                        activeDot={false} 
+                    />
                 </AreaChart>
             </ResponsiveContainer>
         </div>
     );
 };
 
-// MiniAssetCard
 const MiniAssetCard = ({ a, sparkline }: { a: Asset, sparkline: number[] }) => {
     const trend = a.change_24h >= 0 ? 'up' : 'down';
     const color = trend === 'up' ? '#26a69a' : '#ef5350';
     const Icon = trend === 'up' ? ArrowUpRight : ArrowDownRight;
+
     const sparklineData = (sparkline && sparkline.length > 0)
         ? sparkline
         : (trend === 'up' ? STATIC_UP_CHART_DATA : STATIC_DOWN_CHART_DATA);
@@ -105,7 +142,7 @@ const MiniAssetCard = ({ a, sparkline }: { a: Asset, sparkline: number[] }) => {
                 <div className="flex justify-between mb-4">
                     <div className="flex gap-3 items-center">
                         <img 
-                            src={a.logo_url || FALLBACK_LOGO} 
+                            src={getCoinLogo(a.coin_id)} 
                             alt={a.name} 
                             className="size-12 rounded-full" 
                             onError={(e:any) => e.target.src = FALLBACK_LOGO}
@@ -126,7 +163,6 @@ const MiniAssetCard = ({ a, sparkline }: { a: Asset, sparkline: number[] }) => {
     );
 };
 
-// CoinDropdown
 const CoinDropdown = ({ assets, selectedId, onChange }: any) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -145,7 +181,7 @@ const CoinDropdown = ({ assets, selectedId, onChange }: any) => {
                 {selected ? (
                     <>
                         <img 
-                            src={selected.logo_url || FALLBACK_LOGO} 
+                            src={getCoinLogo(selected.coin_id)} 
                             className="size-6 rounded-full" 
                             alt=""
                             onError={(e:any) => e.target.src = FALLBACK_LOGO}
@@ -165,7 +201,7 @@ const CoinDropdown = ({ assets, selectedId, onChange }: any) => {
                         {filtered.map((a: Asset) => (
                             <button key={a.coin_id} onClick={()=>{onChange(a.coin_id);setIsOpen(false);setSearchTerm("")}} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${a.coin_id===selectedId?'bg-yellow-400/20 text-yellow-400':'text-white hover:bg-white/5'}`}>
                                 <img 
-                                    src={a.logo_url || FALLBACK_LOGO} 
+                                    src={getCoinLogo(a.coin_id)} 
                                     className="size-6 rounded-full" 
                                     alt=""
                                     onError={(e:any) => e.target.src = FALLBACK_LOGO}
@@ -185,10 +221,6 @@ const CoinDropdown = ({ assets, selectedId, onChange }: any) => {
     );
 };
 
-
-// =======================================================
-// *** COMPONENT TradingChart (ĐÃ FIX LỖI TYPESCRIPT) ***
-// =======================================================
 interface TradingChartProps {
     data: ChartDataPoint[];
     chartType: ChartType;
@@ -199,12 +231,10 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, chartType }) => {
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<"Candlestick" | "Area"> | null>(null);
 
-    // 1. Hook để tạo và dọn dẹp biểu đồ
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
         const chart = createChart(chartContainerRef.current, {
-            // Cấu hình giao diện tối
             layout: {
                 background: { type: ColorType.Solid, color: '#141414' },
                 textColor: 'rgba(255, 255, 255, 0.6)',
@@ -222,32 +252,21 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, chartType }) => {
                 borderVisible: false,
             },
             crosshair: {
-                mode: 1, // 0 = normal, 1 = magnet
-                vertLine: {
-                    color: '#FFFFFF80',
-                    style: LineStyle.Dashed,
-                },
-                horzLine: {
-                    color: '#FFFFFF80',
-                    style: LineStyle.Dashed,
-                },
+                mode: 1,
+                vertLine: { color: '#FFFFFF80', style: LineStyle.Dashed },
+                horzLine: { color: '#FFFFFF80', style: LineStyle.Dashed },
             },
         });
         chartRef.current = chart;
 
-        // Xử lý resize
         const handleResize = () => {
             if (chartContainerRef.current) {
-                chart.resize(
-                    chartContainerRef.current.clientWidth, 
-                    chartContainerRef.current.clientHeight
-                );
+                chart.resize(chartContainerRef.current.clientWidth, chartContainerRef.current.clientHeight);
             }
         };
         handleResize();
         window.addEventListener('resize', handleResize);
 
-        // Dọn dẹp
         return () => {
             window.removeEventListener('resize', handleResize);
             if (chartRef.current) {
@@ -255,14 +274,12 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, chartType }) => {
                 chartRef.current = null;
             }
         };
-    }, []); // Chỉ chạy 1 lần khi component mount
+    }, []);
 
-    // 2. Hook để cập nhật dữ liệu và loại biểu đồ
     useEffect(() => {
         const chart = chartRef.current;
         if (!chart || !data) return;
 
-        // Xóa series cũ nếu có
         if (seriesRef.current) {
             chart.removeSeries(seriesRef.current);
             seriesRef.current = null;
@@ -278,46 +295,38 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, chartType }) => {
             } as CandlestickSeriesPartialOptions);
             
             const formattedData = data.map(dp => ({
-                // *** FIX: Ép kiểu về UTCTimestamp ***
                 time: (new Date(dp.date).getTime() / 1000) as UTCTimestamp, 
-                open: dp.open,
-                high: dp.high,
-                low: dp.low,
-                close: dp.close,
+                open: dp.open, high: dp.high, low: dp.low, close: dp.close,
             }));
             
             candlestickSeries.setData(formattedData);
             seriesRef.current = candlestickSeries;
 
-        } else { // 'area'
+        } else {
             const areaSeries = chart.addAreaSeries({
-                lineColor: '#fde047', // Màu vàng
+                lineColor: '#fde047',
                 lineWidth: 2,
-                topColor: 'rgba(253, 224, 71, 0.3)', // Màu fill vàng mờ
+                topColor: 'rgba(253, 224, 71, 0.3)',
                 bottomColor: 'rgba(253, 224, 71, 0.0)',
             } as AreaSeriesPartialOptions);
 
             const formattedData = data.map(dp => ({
-                // *** FIX: Ép kiểu về UTCTimestamp ***
                 time: (new Date(dp.date).getTime() / 1000) as UTCTimestamp,
-                value: dp.close, // Biểu đồ đường/diện tích dùng giá đóng cửa
+                value: dp.close,
             }));
             
             areaSeries.setData(formattedData);
             seriesRef.current = areaSeries;
         }
         
-        // Tự động điều chỉnh khung nhìn
         if (data.length > 0) {
             chart.timeScale().fitContent();
         }
 
-    }, [data, chartType]); // Chạy lại khi data hoặc chartType thay đổi
+    }, [data, chartType]);
 
-    // Component chỉ render 1 cái div container
     return <div ref={chartContainerRef} className="w-full h-full absolute inset-0" />;
 };
-// =======================================================
 
 
 // --- MAIN COMPONENT ---
@@ -335,10 +344,26 @@ export default function Dashboard() {
     const [marketChange30D, setMarketChange30D] = useState<number | null>(null);
     const [assetStartIndex, setAssetStartIndex] = useState(0);
     const [sparklineData, setSparklineData] = useState<SparklineMap>({});
+    
+    // Portfolio State
+    const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
 
     const top10Assets = useMemo(() => assets.slice(0, 10), [assets]);
 
-    // useEffect 1
+    // Load Portfolio from LocalStorage
+    useEffect(() => {
+        const saved = localStorage.getItem("my_portfolio");
+        if (saved) {
+            setPortfolio(JSON.parse(saved));
+        } else {
+            setPortfolio([
+                {n:'Bitcoin',c:'BTC',id:'bitcoin',cl:'#f7931a'},
+                {n:'Tether',c:'USDT',id:'tether',cl:'#26a17b'},
+                {n:'Ethereum',c:'ETH',id:'ethereum',cl:'#627eea'}
+            ]);
+        }
+    }, []);
+
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/coins/top100`)
         .then(r => r.json())
@@ -374,8 +399,6 @@ export default function Dashboard() {
         fetch(`${API_BASE_URL}/api/market/cap_growth_30d`).then(r=>r.json()).then(d=>setMarketChange30D(d.change_pct_market_30d)).catch(e=>console.error("Fetch 30D Error:", e));
     }, [selectedId]);
 
-    
-    // useEffect 2: Fetch chart data
     useEffect(() => {
         if (!selectedId) {
             setChartData([]);
@@ -387,9 +410,7 @@ export default function Dashboard() {
         
         fetch(`${API_BASE_URL}/api/coins/${selectedId}/history?start_date=${startDateStr}&time_range=${timeRange}`)
             .then(r => {
-                if (!r.ok) {
-                    throw new Error(`HTTP error! status: ${r.status}`);
-                }
+                if (!r.ok) throw new Error(`HTTP error! status: ${r.status}`);
                 return r.json();
             })
             .then((data: ChartDataPoint[]) => {
@@ -400,16 +421,12 @@ export default function Dashboard() {
                 console.error("Lỗi khi tải dữ liệu biểu đồ:", e);
                 setChartData([]);
             })
-            .finally(() => {
-                setLoading(false);
-            });
+            .finally(() => setLoading(false));
 
     }, [selectedId, timeRange]);
 
-
     const selectedInfo = useMemo(()=>assets.find(a=>a.coin_id===selectedId),[assets,selectedId]);
     
-    // MarketChangeDisplay
     const MarketChangeDisplay = ({ label, value }: { label: string, value: number | null }) => {
         const isUp = value != null && value >= 0;
         const color = value == null ? 'text-white/50' : isUp ? 'text-emerald-400' : 'text-red-500';
@@ -453,10 +470,17 @@ export default function Dashboard() {
         ));
     };
 
+    const handleRemoveCoin = (e: React.MouseEvent, coinId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const updatedPortfolio = portfolio.filter(p => p.id !== coinId);
+        setPortfolio(updatedPortfolio);
+        localStorage.setItem("my_portfolio", JSON.stringify(updatedPortfolio));
+    };
+
     return (
         <DashboardLayout>
             <div className="p-6 space-y-8 text-white">
-                {/* Header */}
                 <div className="flex items-end justify-between">
                     <div>
                         <div className="text-sm font-medium text-white/60 mb-1">TOTAL BALANCE</div>
@@ -469,7 +493,6 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* SLIDER */}
                 <div className="flex items-center gap-2">
                     <button onClick={handleAssetPrev} disabled={assetStartIndex === 0} className="p-2 rounded-full bg-[#141414] hover:bg-[#1a1a1a] ring-1 ring-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                         <ChevronLeft size={24} />
@@ -492,20 +515,52 @@ export default function Dashboard() {
                     </button>
                 </div>
 
-
-                {/* Main Content */}
                 <div className="grid lg:grid-cols-12 gap-6">
-                    
-                    {/* PORTFOLIO */}
+                    {/* --- MY PORTFOLIO SECTION --- */}
                     <div className="lg:col-span-4 rounded-3xl bg-[#fde047] p-6 text-black h-fit sticky top-6">
-                        <div className="flex items-center justify-between mb-6"><h2 className="text-lg font-extrabold">My Portfolio</h2><MoreHorizontal className="opacity-50"/></div>
-                        <div className="space-y-3">{[{n:'Bitcoin',c:'BTC',p:37,cl:'#f7931a'},{n:'Tether',c:'USDT',p:23,cl:'#26a17b'},{n:'Ethereum',c:'ETH',p:20,cl:'#627eea'}].map(i=><div key={i.c} className="flex items-center justify-between rounded-xl bg-black/90 px-4 py-3 text-white"><div className="flex items-center gap-3"><span className="inline-flex size-8 items-center justify-center rounded-full" style={{backgroundColor:i.cl}}/><div><div className="text-sm font-bold">{i.n}</div><div className="text-xs text-white/50">{i.c}</div></div></div><div className="text-sm font-bold">{i.p}%</div></div>)}</div>
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-lg font-extrabold">My Portfolio</h2>
+                            <MoreHorizontal className="opacity-50"/>
+                        </div>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
+                            {portfolio.length > 0 ? (
+                                portfolio.map((item, index) => (
+                                    <Link 
+                                        key={`${item.id}-${index}`}
+                                        to={`/chart/${item.id}`} 
+                                        className="w-full flex items-center justify-between rounded-xl bg-black/90 px-4 py-3 text-white hover:bg-black transition-colors text-left group relative"
+                                    >
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <span className="inline-flex size-8 items-center justify-center rounded-full shrink-0" style={{backgroundColor: item.cl}}>
+                                                {item.c ? item.c[0] : '?'}
+                                            </span>
+                                            <div className="truncate">
+                                                <div className="text-sm font-bold truncate group-hover:text-yellow-400 transition-colors">{item.n}</div>
+                                                <div className="text-xs text-white/50">{item.c}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-sm font-bold shrink-0">
+                                                {(100 / portfolio.length).toFixed(1)}%
+                                            </div>
+                                            <button 
+                                                onClick={(e) => handleRemoveCoin(e, item.id)}
+                                                className="p-1 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-500 text-white/40 opacity-0 group-hover:opacity-100 transition-all"
+                                                title="Remove from portfolio"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    </Link>
+                                ))
+                            ) : (
+                                <div className="text-center text-sm opacity-50 py-4">Portfolio empty</div>
+                            )}
+                        </div>
                     </div>
 
-
-                    {/* Main Chart */}
                     <div className="lg:col-span-8 rounded-3xl bg-[#141414] p-6 ring-1 ring-white/5 flex flex-col min-h-[500px]">
-                        {/* Header Chart */}
                         <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
                             <div>
                                 <CoinDropdown assets={assets} selectedId={selectedId} onChange={setSelectedId}/>
@@ -524,16 +579,13 @@ export default function Dashboard() {
                             </div>
                         </div>
                         
-                        {/* Chart Container */}
                         <div className="flex-1 w-full relative rounded-2xl overflow-hidden bg-gradient-to-b from-[#fde047]/5 to-transparent ring-1 ring-white/5 min-h-[300px]">
                             <TradingChart data={chartData} chartType={chartType} />
-
                             {loading && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-[#141414]/80 z-10">
                                     <div className="animate-spin rounded-full h-10 w-10 border-4 border-white/10 border-t-[#fde047]"/>
                                 </div>
                             )}
-
                             {!loading && chartData.length === 0 && (
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 gap-2">
                                     <Search size={32} className="opacity-50"/>
@@ -541,7 +593,6 @@ export default function Dashboard() {
                                 </div>
                             )}
                         </div>
-
                     </div>
                 </div>
             </div>

@@ -269,7 +269,7 @@ Q_COIN_DETAIL_ALL_METRICS = """
 WITH coin_metrics_with_lag AS (
     SELECT 
         d.full_date,
-        m.coin_id, -- Thêm
+        m.coin_id,
         m.price_usd,
         m.market_cap_usd,
         m.volume24,
@@ -280,12 +280,14 @@ WITH coin_metrics_with_lag AS (
         LAG(m.volume24, 1) OVER (PARTITION BY m.coin_id ORDER BY d.full_date ASC) as prev_volume24
     FROM fact_coin_metrics m
     JOIN dim_dates d ON m.date_id = d.date_id
-    WHERE 
-        m.coin_id = %(coin_id)s
+    WHERE m.coin_id = %(coin_id)s
 )
 SELECT
+    COALESCE(dc.description, m.coin_id) AS name,
+    COALESCE(dc.currency_code, UPPER(SUBSTRING(m.coin_id FROM 1 FOR 3))) AS symbol,
+    
     m.market_cap_usd,
-    m.price_usd, -- Thêm giá
+    m.price_usd,
     CAST(ROUND(CAST(((m.market_cap_usd - m.prev_market_cap) / NULLIF(m.prev_market_cap, 0)) * 100.0 AS numeric), 2) AS double precision) AS market_cap_change_pct_24h,
     m.volume24,
     CAST(ROUND(CAST(((m.volume24 - m.prev_volume24) / NULLIF(m.prev_volume24, 0)) * 100.0 AS numeric), 2) AS double precision) AS volume_change_pct_24h,
@@ -294,10 +296,10 @@ SELECT
     m.tsupply AS total_supply,
     m.msupply AS max_supply,
     m.csupply AS circulating_supply
-FROM 
-    coin_metrics_with_lag m
-ORDER BY
-    m.full_date DESC
+FROM coin_metrics_with_lag m
+LEFT JOIN dim_coin_mapping map ON m.coin_id = map.coin_id
+LEFT JOIN dim_currencies dc ON map.currency_id = dc.currency_id
+ORDER BY m.full_date DESC
 LIMIT 1;
 """
 
@@ -376,9 +378,13 @@ recent_prices AS (
     SELECT f.coin_id, f.close, d.full_date
     FROM fact_price_history f 
     JOIN dim_dates d ON f.date_id = d.date_id
-    JOIN latest_date ld ON f.date_id >= (ld.max_date_id - 6) AND f.date_id <= ld.max_date_id
+    JOIN latest_date ld ON f.date_id > (ld.max_date_id - 365) -- Lấy > 365 ngày trước (tức là 1 năm)
+                       AND f.date_id <= ld.max_date_id
 )
-SELECT coin_id, ARRAY_AGG(close ORDER BY full_date ASC) AS sparkline_prices
+SELECT 
+    coin_id, 
+    -- Gom tất cả giá close thành 1 mảng, sắp xếp theo ngày
+    ARRAY_AGG(close ORDER BY full_date ASC) AS sparkline_prices
 FROM recent_prices 
 GROUP BY coin_id;
 """
